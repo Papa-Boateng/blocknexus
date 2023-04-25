@@ -27,6 +27,8 @@ def start_exchange_amount():
 #Currency Kb
 def supported_currency():
     markup = ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.row_width = 3
     for coin in currency:
         markup.add(KeyboardButton(coin))
+    markup.add(KeyboardButton('⇦'))
     return markup
