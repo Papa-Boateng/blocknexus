@@ -5,6 +5,7 @@ from telebot import custom_filters
 from telebot.storage import StateMemoryStorage
 from flask import Flask, request
 from coinbase.wallet.client import Client
+import coinaddrvalidator
 import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import firestore
@@ -115,7 +116,7 @@ def from_currency(message):
             ##set state currency to
         elif value_type == 'USD':
             enable_currency_convert = value_type
-            bot.send_message(chat_id=chat_id, text="Select the currency to be equivalent in USD", reply_markup=keyboard.supported_currency())
+            bot.send_message(chat_id=chat_id, text="Select the crypto currency to be equivalent in USD", reply_markup=keyboard.supported_currency())
             bot.set_state(message.from_user.id, states.ExchangeState.currency_to, chat_id)
             ##Set state currency to
         elif value_type == '⇦':
@@ -132,25 +133,30 @@ def to_currency(message):
     try:
         chat_id=message.chat.id
         _from_convert_currency = message.text
-        with bot.retrieve_data(message.from_user.id, message.chat.id) as data:
-            base_amount = float(data['amount'])
-            if enable_currency_convert == 'USD':
-                current_price = cb_client.get_exchange_rates(currency=_from_convert_currency)
-                _in_usd = float(current_price['rates']['USD'])
-                _in_crypto = base_amount/_in_usd
-                crypto_amount = '{:0.8f}'.format(_in_crypto)
-                msg = block_msg.currency_from_msg.format(_from_convert_currency, crypto_amount, '{:0,.2f}'.format(base_amount))
-                data['usd_amount'] = base_amount
-                data['crypto_amount'] = crypto_amount
-            elif enable_currency_convert == 'BTC':
-                current_price = cb_client.get_exchange_rates(currency=_from_convert_currency)
-                _in_usd = base_amount*float(current_price['rates']['USD'])
-                print(_in_usd)
-                msg = block_msg.currency_from_msg.format(_from_convert_currency, '{:0.8f}'.format(base_amount), '{:0,.2f}'.format(_in_usd))
-                data['usd_amount'] = _in_usd
-                data['crypto_amount'] = base_amount
-            bot.send_message(chat_id=chat_id, text=msg)
-        bot.set_state(message.from_user.id, states.ExchangeState.currency_address, chat_id)
+        if _from_convert_currency in config.currency:
+            with bot.retrieve_data(message.from_user.id, message.chat.id) as data:
+                base_amount = float(data['amount'])
+                if enable_currency_convert == 'USD':
+                    current_price = cb_client.get_exchange_rates(currency=_from_convert_currency)
+                    _in_usd = float(current_price['rates']['USD'])
+                    _in_crypto = base_amount/_in_usd
+                    crypto_amount = '{:0.8f}'.format(_in_crypto)
+                    msg = block_msg.currency_from_msg.format(_from_convert_currency, crypto_amount, '{:0,.2f}'.format(base_amount))
+                    data['usd_amount'] = base_amount
+                    data['crypto_amount'] = crypto_amount
+                elif enable_currency_convert == 'BTC':
+                    current_price = cb_client.get_exchange_rates(currency=_from_convert_currency)
+                    _in_usd = base_amount*float(current_price['rates']['USD'])
+                    msg = block_msg.currency_from_msg.format(_from_convert_currency, '{:0.8f}'.format(base_amount), '{:0,.2f}'.format(_in_usd))
+                    data['usd_amount'] = _in_usd
+                    data['crypto_amount'] = base_amount
+                bot.send_message(chat_id=chat_id, text=msg)
+            bot.set_state(message.from_user.id, states.ExchangeState.currency_address, chat_id)
+        elif _from_convert_currency == '⇦':
+            bot.send_message(chat_id=chat_id, text="⇦Back to <b>amount in USD/BTC</b> select", reply_markup=keyboard.start_exchange_amount())
+            bot.set_state(message.from_user.id, states.ExchangeState.currency_from, chat_id)
+        else:
+            bot.send_message(chat_id=chat_id, text="<code>Invalid entry</code>")
         with bot.retrieve_data(message.from_user.id, message.chat.id) as data:
             data['from_currency'] = _from_convert_currency
     except Exception as e:
@@ -162,13 +168,23 @@ def currency_address(message):
     try:
         chat_id=message.chat.id
         _to_convert_currency = message.text
+        
         with bot.retrieve_data(message.from_user.id, message.chat.id) as data:
-            msg = block_msg.currency_to_msg.format(data['from_currency'],_to_convert_currency,data['crypto_amount'],data['usd_amount'])
+            msg = block_msg.currency_to_msg.format(data['from_currency'],_to_convert_currency, '{:0.8f}'.format(float(data['crypto_amount'])), '{:0,.2f}'.format(float(data['usd_amount'])) )
             bot.send_message(chat_id=chat_id, text=msg)
-        bot.set_state(message.from_user.id, states.ExchangeState.exchange_review, chat_id)
-        nw_msg = (f"Now Enter your <b>{_to_convert_currency}</b> address\n"
-                  "to receive the exchanged currency.")
-        bot.send_message(chat_id=chat_id, text=nw_msg, reply_markup=keyboard.return_kb())
+        if _to_convert_currency in config.currency and _to_convert_currency != data['from_currency']:
+            bot.set_state(message.from_user.id, states.ExchangeState.exchange_review, chat_id)
+            nw_msg = (f"Now Enter your <b>{_to_convert_currency}</b> address\n"
+                      "to receive the exchanged currency.")
+            bot.send_message(chat_id=chat_id, text=nw_msg, reply_markup=keyboard.return_kb())
+        elif _to_convert_currency in config.currency and _to_convert_currency == data['from_currency']:
+            bot.send_message(chat_id=chat_id, text="<code>Cannot convert to the same currency</code>")
+        elif _to_convert_currency == '⇦':
+            bot.send_message(chat_id=chat_id, text="⇦Back to <b>Currency from</b> exchange", reply_markup=keyboard.supported_currency())
+            bot.set_state(message.from_user.id, states.ExchangeState.currency_to, chat_id)
+        else:
+            bot.send_message(chat_id=chat_id, text="<code>Invalid entry</code>")
+        print(data['from_currency'])
         with bot.retrieve_data(message.from_user.id, message.chat.id) as data:
             data['to_currency'] = _to_convert_currency
     except Exception as e:
@@ -181,15 +197,23 @@ def exchange_review(message):
         chat_id=message.chat.id
         global order
         _currency_address = message.text
-        with bot.retrieve_data(message.from_user.id, message.chat.id) as data:
-            msg = block_msg.currency_review.format(data['from_currency'],data['to_currency'],data['crypto_amount'],data['usd_amount'], _currency_address)
-            bot.send_message(chat_id=chat_id, text=msg, reply_markup=keyboard.confirm_kb())
-        bot.set_state(message.from_user.id, states.ExchangeState.exchange_confirm, chat_id)
-        order = {'currency_from': data['from_currency'],
-                 'currency_to': data['to_currency'],
-                 'crypto_amount': data['crypto_amount'],
-                 'usd_amount': data['usd_amount'],
-                 'recieve_address': _currency_address}        
+        if _currency_address == '⇦':
+            bot.send_message(chat_id=chat_id, text="⇦Back to <b>Currency from</b> exchange", reply_markup=keyboard.supported_currency())
+            bot.set_state(message.from_user.id, states.ExchangeState.currency_to, chat_id)
+        else:
+            with bot.retrieve_data(message.from_user.id, message.chat.id) as data:
+                valid_address = coinaddrvalidator.validate(data['to_currency'].lower(), _currency_address)
+                if valid_address.valid == True:
+                    msg = block_msg.currency_review.format(data['from_currency'],data['to_currency'], '{:0.8f}'.format(float(data['crypto_amount'])), '{:0,.2f}'.format(float(data['usd_amount'])), _currency_address)
+                    bot.send_message(chat_id=chat_id, text=msg, reply_markup=keyboard.confirm_kb())
+                    bot.set_state(message.from_user.id, states.ExchangeState.exchange_confirm, chat_id)
+                    order = {'currency_from': data['from_currency'],
+                             'currency_to': data['to_currency'],
+                             'crypto_amount': data['crypto_amount'],
+                             'usd_amount': data['usd_amount'],
+                             'recieve_address': _currency_address}        
+                else:
+                    bot.send_message(chat_id=chat_id, text=f"<code>Enter a valid {data['to_currency']} address</code>")
     except Exception as e:
         send_error_message(chat_id, e)
 #currency confirm
@@ -201,7 +225,7 @@ def exchange_confirm(message):
         send_to_address = '13TEa75uTAL35nS4TNZXnffcFNGcSdj23Q'
         time_new = '00:30:00'
         if select_option == 'Confirm ✅':
-            msg = block_msg.exchange_confirm_msg.format(order['currency_from'], order['currency_to'], order['crypto_amount'], order['usd_amount'], order['recieve_address'], order['currency_from'], send_to_address, order['crypto_amount'], time_new)
+            msg = block_msg.exchange_confirm_msg.format(order['currency_from'], order['currency_to'], '{:0.8f}'.format(float(order['crypto_amount'])), '{:0,.2f}'.format(float(order['usd_amount'])), order['recieve_address'], order['currency_from'], send_to_address, '{:0.8f}'.format(float(order['crypto_amount'])), time_new)
             bot.send_message(chat_id=chat_id, text=msg)
             bot.delete_state(message.from_user.id, chat_id)
         if select_option == '⇦':

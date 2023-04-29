@@ -11,8 +11,8 @@ currency = ['BTC',
             'DASH']
 
 #coinbase api
-coinbase_api_key = 'TvgenWtKNRBeEF6D'
-coinbase_api_secret = 'Nv3ZCN6reMmkfh8q9S9lRP1Rcr9sD2Ib'
+coinbase_api_key = 'w6FxDzDXrlRhDnlL'
+coinbase_api_secret = 'ZrCcF1iH5oqrGU6XfTlSOWJWHwfyOh1g'
 
 
 def Webhook():

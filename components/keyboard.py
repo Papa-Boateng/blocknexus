@@ -29,6 +29,11 @@ def return_kb():
     markup.add(btn_return)
     return markup
 
+def done_action_kb():
+    markup = ReplyKeyboardMarkup(resize_keyboard=True)
+    btn_return = KeyboardButton("Done ✅")
+    markup.add(btn_return)
+    return markup
 #start exchange
 def start_exchange_amount():
     markup = ReplyKeyboardMarkup(resize_keyboard=True)
