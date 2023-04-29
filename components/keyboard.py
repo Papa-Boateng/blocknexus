@@ -14,6 +14,21 @@ def main_menu():
 
 #Inner Menu kb
 
+#Confirm
+def confirm_kb():
+    markup = ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.row_width = 1
+    btn_ok = KeyboardButton("Confirm ✅")
+    btn_return = KeyboardButton("⇦")
+    markup.add(btn_ok,btn_return)
+    return markup
+#return btn
+def return_kb():
+    markup = ReplyKeyboardMarkup(resize_keyboard=True)
+    btn_return = KeyboardButton("⇦")
+    markup.add(btn_return)
+    return markup
+
 #start exchange
 def start_exchange_amount():
     markup = ReplyKeyboardMarkup(resize_keyboard=True)
@@ -27,8 +42,9 @@ def start_exchange_amount():
 #Currency Kb
 def supported_currency():
     markup = ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.row_width = 3
+    #markup.row_width = 2
     for coin in currency:
         markup.add(KeyboardButton(coin))
     markup.add(KeyboardButton('⇦'))
     return markup
+

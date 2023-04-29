@@ -6,6 +6,9 @@ class NexusSection(StatesGroup):
     tickets_state = State()
     base = State()
 
-class ExhangeState(StatesGroup):
+class ExchangeState(StatesGroup):
     currency_from = State()
     currency_to = State()
+    currency_address = State()
+    exchange_review = State()
+    exchange_confirm = State()
