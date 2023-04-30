@@ -37,8 +37,8 @@ def done_action_kb():
 #start exchange
 def start_exchange_amount():
     markup = ReplyKeyboardMarkup(resize_keyboard=True)
-    btn_usd = KeyboardButton("USD")
-    btn_btc = KeyboardButton("BTC")
+    btn_usd = KeyboardButton("USD $")
+    btn_btc = KeyboardButton("BTC ₿")
     btn_return = KeyboardButton("⇦")
     markup.add(btn_usd,btn_btc)
     markup.add(btn_return)

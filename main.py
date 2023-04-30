@@ -1,13 +1,10 @@
 import config
-from components import block_msg, keyboard, states
+from components import block_msg, keyboard, states, db, coinbase_client, payment_address
 import telebot
 from telebot import custom_filters
 from telebot.storage import StateMemoryStorage
 from flask import Flask, request
-from coinbase.wallet.client import Client
 import coinaddrvalidator
-import firebase_admin
-from firebase_admin import credentials
 from firebase_admin import firestore
 
 #State Storage
@@ -15,12 +12,8 @@ state_storage = StateMemoryStorage()
 #Initiate bot instance and webhook
 bot = telebot.TeleBot(config.API_TOKEN, state_storage=state_storage, parse_mode='html')
 server = Flask(__name__)
-#FireStore instance
-cred = credentials.Certificate("auth/serviceAccountKey.json")
-firebase_admin.initialize_app(cred)
-db = firestore.client()
 #initialize coinbase
-cb_client = Client(config.coinbase_api_key, config.coinbase_api_secret)
+cb_client = coinbase_client.cb_client_init
 
 #Handlers
 
@@ -35,7 +28,7 @@ def input_float_parser(s):
     except:
         return False
 
-
+#############COMMANDS
 #To restart/start bot
 @bot.message_handler(commands=['start'])
 def start_bot(message):
@@ -46,7 +39,7 @@ def start_bot(message):
         f_name = message.from_user.first_name
         l_name = message.from_user.last_name
         call_full_name = f"{f_name} {l_name}"
-        set_users_db = db.collection('users')
+        set_users_db = db.new_db.collection('users')
         query_db = set_users_db.document(str(chat_id))
         query_res = query_db.get()
         if query_res.exists:
@@ -62,10 +55,25 @@ def start_bot(message):
                 'username': username,
                 'history': [],
                 'tickets': {},
+                'pay_to_address': [],
                 'date_joined': firestore.SERVER_TIMESTAMP
             })
     except Exception as e:
         send_error_message(chat_id, e)
+
+@bot.message_handler(commands=['start_exchange'])
+def start_exchange(message):
+    try:
+        chat_id=message.chat.id
+        msg=("<b>BlockNexus Exchange</b> 💱\n\n"
+             "To begin, you must enter the amount to exchange from\n"
+             "the base currency is BTC(USD)\n\n"
+             "<em>Enter <b>Amount</b> and select options from below</em>")
+        bot.send_message(chat_id=chat_id, text=msg, reply_markup=keyboard.start_exchange_amount())
+        bot.set_state(message.from_user.id, states.NexusSection.exchange_state, chat_id)
+    except Exception as e:
+        send_error_message(chat_id, e)
+################
 
 #Menu Keyboard Functions
 @bot.message_handler(func=lambda message: message.text=='Start Exchange 💱')
@@ -109,13 +117,13 @@ def from_currency(message):
         chat_id=message.chat.id
         global enable_currency_convert
         value_type = message.text
-        if value_type == 'BTC':
-            enable_currency_convert = value_type
+        if value_type == 'BTC ₿':
+            enable_currency_convert = "BTC"
             bot.send_message(chat_id=chat_id, text="Confirm <b>BTC</b> or change currency", reply_markup=keyboard.supported_currency())
             bot.set_state(message.from_user.id, states.ExchangeState.currency_to, chat_id)
             ##set state currency to
-        elif value_type == 'USD':
-            enable_currency_convert = value_type
+        elif value_type == 'USD $':
+            enable_currency_convert = "USD"
             bot.send_message(chat_id=chat_id, text="Select the crypto currency to be equivalent in USD", reply_markup=keyboard.supported_currency())
             bot.set_state(message.from_user.id, states.ExchangeState.currency_to, chat_id)
             ##Set state currency to
@@ -222,19 +230,28 @@ def exchange_confirm(message):
     try:
         chat_id=message.chat.id
         select_option = message.text
-        send_to_address = '13TEa75uTAL35nS4TNZXnffcFNGcSdj23Q'
+        set_users_db = db.new_db.collection('users')
         time_new = '00:30:00'
         if select_option == 'Confirm ✅':
+            bot.send_message(chat_id=chat_id, text="<em>processing...</em>")
+            payment_address.process_new_address(chat_id, order['currency_from'], message)
+            _user_valid_address = set_users_db.document(str(chat_id)).get()
+            get_user_data = _user_valid_address.to_dict()
+            send_to_address = get_user_data['pay_to_address'][0]
             msg = block_msg.exchange_confirm_msg.format(order['currency_from'], order['currency_to'], '{:0.8f}'.format(float(order['crypto_amount'])), '{:0,.2f}'.format(float(order['usd_amount'])), order['recieve_address'], order['currency_from'], send_to_address, '{:0.8f}'.format(float(order['crypto_amount'])), time_new)
-            bot.send_message(chat_id=chat_id, text=msg)
-            bot.delete_state(message.from_user.id, chat_id)
-        if select_option == '⇦':
+            bot.send_message(chat_id=chat_id, text=msg, reply_markup=keyboard.done_action_kb())
+        elif select_option == '⇦':
             bot.set_state(message.from_user.id, states.ExchangeState.exchange_review, chat_id)
             bot.send_message(chat_id=chat_id, text="Re-enter Receive address", reply_markup=keyboard.return_kb())
-        # else:
-        #     bot.send_message(chat_id=chat_id, text="Choose from menu")
+        elif select_option == 'Done ✅':
+            bot.delete_state(message.from_user.id, chat_id)
+            bot.send_message(chat_id=chat_id, text="<b>Dashboard</b>", reply_markup=keyboard.main_menu())
+        else:
+            bot.send_message(chat_id=chat_id, text="Choose from menu")
     except Exception as e:
         send_error_message(chat_id, e)
+#Process completed
+
 
 
 bot.add_custom_filter(custom_filters.StateFilter(bot))
