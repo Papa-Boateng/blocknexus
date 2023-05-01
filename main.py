@@ -56,6 +56,7 @@ def start_bot(message):
                 'history': [],
                 'tickets': {},
                 'pay_to_address': [],
+                'send_to_address': [],
                 'date_joined': firestore.SERVER_TIMESTAMP
             })
     except Exception as e:
