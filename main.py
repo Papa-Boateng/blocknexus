@@ -1,5 +1,5 @@
 import config
-from components import block_msg, keyboard, states, db, coinbase_client, payment_address
+from components import block_msg, keyboard, states, db, coinbase_client, payment_address, order_id
 import telebot
 from telebot import custom_filters
 from telebot.storage import StateMemoryStorage
@@ -56,7 +56,6 @@ def start_bot(message):
                 'history': [],
                 'tickets': {},
                 'pay_to_address': [],
-                'send_to_address': [],
                 'date_joined': firestore.SERVER_TIMESTAMP
             })
     except Exception as e:
@@ -216,7 +215,9 @@ def exchange_review(message):
                     msg = block_msg.currency_review.format(data['from_currency'],data['to_currency'], '{:0.8f}'.format(float(data['crypto_amount'])), '{:0,.2f}'.format(float(data['usd_amount'])), _currency_address)
                     bot.send_message(chat_id=chat_id, text=msg, reply_markup=keyboard.confirm_kb())
                     bot.set_state(message.from_user.id, states.ExchangeState.exchange_confirm, chat_id)
-                    order = {'currency_from': data['from_currency'],
+                    new_order_id = order_id.process_order_id(8)
+                    order = {'id': new_order_id,
+                             'currency_from': data['from_currency'],
                              'currency_to': data['to_currency'],
                              'crypto_amount': data['crypto_amount'],
                              'usd_amount': data['usd_amount'],
@@ -238,8 +239,10 @@ def exchange_confirm(message):
             payment_address.process_new_address(chat_id, order['currency_from'], message)
             _user_valid_address = set_users_db.document(str(chat_id)).get()
             get_user_data = _user_valid_address.to_dict()
-            send_to_address = get_user_data['pay_to_address'][0]
+            _address_selector = len(get_user_data['pay_to_address']) - 1
+            send_to_address = get_user_data['pay_to_address'][_address_selector]
             msg = block_msg.exchange_confirm_msg.format(order['currency_from'], order['currency_to'], '{:0.8f}'.format(float(order['crypto_amount'])), '{:0,.2f}'.format(float(order['usd_amount'])), order['recieve_address'], order['currency_from'], send_to_address, '{:0.8f}'.format(float(order['crypto_amount'])), time_new)
+            order_id.process_order_history(chat_id, order)
             bot.send_message(chat_id=chat_id, text=msg, reply_markup=keyboard.done_action_kb())
         elif select_option == '⇦':
             bot.set_state(message.from_user.id, states.ExchangeState.exchange_review, chat_id)
