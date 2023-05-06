@@ -25,7 +25,7 @@ def process_new_address(chat_id, deposit_curreny, message):
     _network = account_address['network']
     _delimiter = len(_network)
     network = _network[0].upper()+ _network[1:_delimiter]
-    title =  "{} ({})".format(network, tool_tip[0])  
+    #title =  "{} ({})".format(network, tool_tip[0])  
     address = account_address['address']
     qr = qrcode.make(address)
     qr_code_img = qr.get_image()

@@ -36,3 +36,17 @@ exchange_confirm_msg = ("<b>BlockNexus (Exchange order Created):</b>\n\n"
                         "------------------------------[+]\n"
                         "<code>Time: {}</code>\n"
                         "------------------------------[+]")
+
+currency_rates_msg = ("<b>CRYPTO CURRENCY RATES📈</b>:\n"
+                "Here is a list of the current supported <b>Crypto</b> to <b>USD</b> rates:\n"
+                "{}\n"
+                "<em>Bot's supported crypto currencies💱</em>")
+
+exchange_history_msg = ("--------------------------------[+]\n"
+                        "Order ID : <b>#{}</b>           [+]\n"
+                        "--------------------------------[+]\n"
+                        "<code>Currency from: {}\n"
+                        "Curreny to: {}\n"
+                        "Receive Address: {}\n"
+                        "Amout: {} (${})</code>\n"
+                        "--------------------------------[+]")

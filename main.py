@@ -256,6 +256,43 @@ def exchange_confirm(message):
         send_error_message(chat_id, e)
 #Process completed
 
+#Currency rates
+@bot.message_handler(func=lambda message: message.text=='Currency Rates ₿')
+def currency_exchange(message):
+    try:
+        chat_id=message.chat.id
+        currency_list = config.currency
+        rates_list = ''
+        for itm in currency_list:
+            price = cb_client.get_exchange_rates(currency=itm)
+            conv_prc = float(price['rates']['USD'])
+            fmt_cnv_prc = '{:0,.2f}'.format(conv_prc)
+            rates_list += '1 <b>{}</b> = <b>${}</b>\n'.format(itm,fmt_cnv_prc)
+        msg = block_msg.currency_rates_msg.format(rates_list)
+        bot.send_message(chat_id=chat_id, text=msg)
+    except Exception as e:
+        send_error_message(chat_id, e)
+
+#Exchange history
+@bot.message_handler(func=lambda message: message.text=='Exchange History 🧾')
+def currency_history(message):
+    try:
+        chat_id=message.chat.id
+        set_users_db = db.new_db.collection('users')
+        query_db = set_users_db.document(str(chat_id))
+        query_res = query_db.get()
+        qd_res = query_res.to_dict()
+        orders = qd_res['history']
+        _test_orders = len(orders)
+        if _test_orders > 0:
+            bot.send_message(chat_id=chat_id, text="<b>Exchange History:\n⬇️</b>")
+            for idx in range(_test_orders):
+                msg = block_msg.exchange_history_msg.format(orders[idx]['id'], orders[idx]['currency_from'], orders[idx]['currency_to'], orders[idx]['recieve_address'], orders[idx]['crypto_amount'], orders[idx]['usd_amount'])
+                bot.send_message(chat_id=chat_id, text=msg)
+        else: 
+            bot.send_message(chat_id=chat_id, text="<em>No recent orders here</em>")
+    except Exception as e:
+        send_error_message(chat_id, e)
 
 
 bot.add_custom_filter(custom_filters.StateFilter(bot))
